@@ -1,4 +1,5 @@
 import json, random, uuid, time, argparse
+from collections import defaultdict
 from datetime import datetime
 
 start_time = time.perf_counter()
@@ -19,16 +20,17 @@ def create_impression():
 #adding rate of event generation. should be passed as an arg
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--rate", type=int,
+parser.add_argument("--rate",
+                    type=int,
                     default=1000,
                     help="the number of events that should be generated per second")
 args = parser.parse_args()
 
 #gerating events and storing
-with open("events.json", "w") as f:
-    for _ in range(1000):
+with open("../consumer/events.json", "w") as f:
+    for _ in range(10000):
         iteration_start_time = time.perf_counter() # start timer to collect time elapsed for a single event
-        f.write(json.dumps(create_impression()) + '\n')
+        f.write(json.dumps(create_impression()) + "\n")
         iteration_end_time = time.perf_counter() # ending timer
 
         itr_time = iteration_end_time - iteration_start_time # time it took for one event
@@ -41,5 +43,13 @@ with open("events.json", "w") as f:
 
 end_time = time.perf_counter()
 print(f"Time taken: {end_time - start_time} seconds")
+
+
+
+
+
+
+
+
 
 
