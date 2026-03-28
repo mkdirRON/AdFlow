@@ -5,20 +5,35 @@ from datetime import datetime
 start_time = time.perf_counter()
 
 
-def create_impression():
-    #creating and return JSON imitating Ad bidding data
+def create_event():  # a base func that handles generic event creation
+
     return {
         "event_id": str(uuid.uuid4()),
-        "event_type": "impression",
         "timestamp": str(datetime.now()),
         "user_id": f"user_{random.randint(1, 100000)}",
         "campaign_id": f"camp_id{random.randint(1, 100000)}",
-        "bid_price": round(random.uniform(0.15, 0.5), 4),
-        "site": random.choice(["news.com", "sports.com", "finance.com"])
+        "site": random.choice(["news.com", "sports.com", "finance.com", "cars.com"])
     }
 
-#adding rate of event generation. should be passed as an arg
+def create_impression(base_dict): # func that adds metadata that makes a genric event an "impression" should take a dict as input"
+    impression = {"event_type": "impression"}
+    return  base_dict | impression
 
+def create_click(base_dict): # func that adds metadata that makes a genric event a "click" should take a dict as input
+    click = {"event_type": "click",
+             "conversion": random.choice([True, False])} #conversion rate is unrealistic. should try to simulate a rate of 1-3%
+    return   base_dict | click
+
+def create_bid(base_dict): # func that adds metadata that makes a genric event a "bid" should take a dict as input
+    bid = {"event_type": "bid",
+           "bid_density":random.randint(1, 6),
+           "bid_price": round(random.uniform(0.15, 0.5), 4)
+    }
+    return base_dict | bid
+
+
+
+#adding rate of event generation. should be passed as an arg
 parser = argparse.ArgumentParser()
 parser.add_argument("--rate",
                     type=int,
@@ -29,8 +44,14 @@ args = parser.parse_args()
 #gerating events and storing
 with open("../consumer/events.json", "w") as f:
     for _ in range(10000):
-        iteration_start_time = time.perf_counter() # start timer to collect time elapsed for a single event
-        f.write(json.dumps(create_impression()) + "\n")
+        iteration_start_time = time.perf_counter()  # start timer to collect time elapsed for a single event
+
+        f.write(json.dumps(random.choice(
+            [create_impression(create_event()),
+             create_bid(create_event()),
+             create_click(create_event())]))
+                + "\n")
+
         iteration_end_time = time.perf_counter() # ending timer
 
         itr_time = iteration_end_time - iteration_start_time # time it took for one event
