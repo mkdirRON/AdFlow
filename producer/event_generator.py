@@ -4,14 +4,15 @@ from datetime import datetime
 
 start_time = time.perf_counter()
 
+BOOTSTRAP_SERVERS=['localhost:9092']
+VALUE_SERIALIZER =lambda v: json.dumps(v).encode('utf-8')
+
 # init out kafka producer.
-producer = kafka.KafkaProducer(bootstrap_servers=['localhost:9092'],
-                               value_serializer=lambda v: json.dumps(v).encode('utf-8')
+producer = kafka.KafkaProducer(bootstrap_servers=BOOTSTRAP_SERVERS,
+                               value_serializer= VALUE_SERIALIZER
                               )
 
-
 def create_event():  # a base func that handles generic event creation
-
     return {
         "event_id": str(uuid.uuid4()),
         "timestamp": str(datetime.now()),
@@ -47,13 +48,9 @@ parser.add_argument("--rate",
                     help="the number of events that should be generated per second")
 args = parser.parse_args()
 
-def rand_choice():
-   pass
-
 #gerating events and storing
 for _ in range(10000):
         iteration_start_time = time.perf_counter()  # start timer to collect time elapsed for a single event
-
 
         event = random.choice([create_impression(create_event()),
                                create_click(create_event()),

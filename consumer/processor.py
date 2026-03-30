@@ -5,11 +5,13 @@ from kafka import KafkaProducer
 TOPICS = ["clicks", "impressions", "bids"]
 BOOTSTRAP_SERVERS = ["localhost:9092"]
 AUTO_OFFSET_RESET='earliest'
+VALUE_DESERIALIZER =lambda x: json.loads(x.decode('utf-8'))
 
 consumer = kafka.KafkaConsumer(*TOPICS,
                                bootstrap_servers=BOOTSTRAP_SERVERS,
                                auto_offset_reset=AUTO_OFFSET_RESET,
-                               value_deserializer=lambda x: json.loads(x.decode('utf-8')))
+                               value_deserializer= VALUE_DESERIALIZER
+                             )
 
 impression_map = defaultdict(int)
 click_map = defaultdict(int)
@@ -31,12 +33,10 @@ except KeyboardInterrupt as e:
 print(f" number of impressions per campaign:"
       f" {impression_map}" + "\n")
 
-
 CTR_map = defaultdict(float)
 # loop through both impression dicts,
 # count the number of impressions and clicks a simgle campaign id has
 # return click/impressions for each campaign
-
 for key in impression_map:
     if click_map[key] == 0:
         CTR_map[key] = 0
