@@ -1,8 +1,13 @@
-import json, random, uuid, time, argparse
+import json, random, uuid, time, argparse, kafka
 from collections import defaultdict
 from datetime import datetime
 
 start_time = time.perf_counter()
+
+# init out kafka producer.
+producer = kafka.KafkaProducer(bootstrap_servers=['localhost:9092'],
+                               value_serializer=lambda v: json.dumps(v).encode('utf-8')
+                              )
 
 
 def create_event():  # a base func that handles generic event creation
@@ -15,23 +20,24 @@ def create_event():  # a base func that handles generic event creation
         "site": random.choice(["news.com", "sports.com", "finance.com", "cars.com"])
     }
 
-def create_impression(base_dict): # func that adds metadata that makes a genric event an "impression" should take a dict as input"
+# func that adds metadata that makes a genric event an "impression" should take a dict as input"
+def create_impression(base_dict):
     impression = {"event_type": "impression"}
     return  base_dict | impression
 
-def create_click(base_dict): # func that adds metadata that makes a genric event a "click" should take a dict as input
+# func that adds metadata that makes a genric event a "click" should take a dict as input
+def create_click(base_dict):
     click = {"event_type": "click",
              "conversion": random.choice([True, False])} #conversion rate is unrealistic. should try to simulate a rate of 1-3%
     return   base_dict | click
 
-def create_bid(base_dict): # func that adds metadata that makes a genric event a "bid" should take a dict as input
+# func that adds metadata that makes a genric event a "bid" should take a dict as input
+def create_bid(base_dict):
     bid = {"event_type": "bid",
            "bid_density":random.randint(1, 6),
            "bid_price": round(random.uniform(0.15, 0.5), 4)
     }
     return base_dict | bid
-
-
 
 #adding rate of event generation. should be passed as an arg
 parser = argparse.ArgumentParser()
@@ -41,16 +47,24 @@ parser.add_argument("--rate",
                     help="the number of events that should be generated per second")
 args = parser.parse_args()
 
+def rand_choice():
+   pass
+
 #gerating events and storing
-with open("../consumer/events.json", "w") as f:
-    for _ in range(10000):
+for _ in range(10000):
         iteration_start_time = time.perf_counter()  # start timer to collect time elapsed for a single event
 
-        f.write(json.dumps(random.choice(
-            [create_impression(create_event()),
-             create_bid(create_event()),
-             create_click(create_event())]))
-                + "\n")
+
+        event = random.choice([create_impression(create_event()),
+                               create_click(create_event()),
+                               create_bid(create_event())])
+
+        if event["event_type"] == "impression":
+            producer.send('impressions',event )
+        if event["event_type"] == "click":
+            producer.send('clicks',event)
+        if event["event_type"] == "bid":
+                producer.send('bids',event)
 
         iteration_end_time = time.perf_counter() # ending timer
 
@@ -60,17 +74,9 @@ with open("../consumer/events.json", "w") as f:
             sleep_time = 0
         time.sleep(sleep_time)
 
-
-
 end_time = time.perf_counter()
 print(f"Time taken: {end_time - start_time} seconds")
 
+producer.flush()
 
-
-
-
-
-
-
-
-
+producer.close()
