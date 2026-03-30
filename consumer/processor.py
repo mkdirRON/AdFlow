@@ -1,26 +1,36 @@
-import collections, json
+import collections, json, kafka
 from collections import defaultdict
+from kafka import KafkaProducer
 
+TOPICS = ["clicks", "impressions", "bids"]
+BOOTSTRAP_SERVERS = ["localhost:9092"]
+AUTO_OFFSET_RESET='earliest'
 
-
+consumer = kafka.KafkaConsumer(*TOPICS,
+                               bootstrap_servers=BOOTSTRAP_SERVERS,
+                               auto_offset_reset=AUTO_OFFSET_RESET,
+                               value_deserializer=lambda x: json.loads(x.decode('utf-8')))
 
 impression_map = defaultdict(int)
 click_map = defaultdict(int)
-with open("events.json", "r") as f:
-    for line in f:
-        try:
-            event = json.loads(line)
-            if event["event_type"] == "impression":
-                impression_map[event["campaign_id"]] += 1
 
-            if event["event_type"] == "click":
-                click_map[event["campaign_id"]] += 1
-        except json.decoder.JSONDecodeError as e:
+try:
+    for message in consumer:
 
-            print(f"error parsing event: {e}")
+        if message is not None:
+            print(f"Message received. Topic: {message.topic}")
+            if message.topic == "impressions":
+                impression_map[message.value["campaign_id"]] += 1
+
+            if message.topic == "clicks":
+                click_map[message.value["campaign_id"]] += 1
+
+except KeyboardInterrupt as e:
+    print(f'user interrupted. {e}')
 
 print(f" number of impressions per campaign:"
       f" {impression_map}" + "\n")
+
 
 CTR_map = defaultdict(float)
 # loop through both impression dicts,
@@ -33,7 +43,4 @@ for key in impression_map:
     else:
         CTR_map[key] = click_map[key]/impression_map[key]
 
-
 print(f"CTR map: {CTR_map}")
-
-
