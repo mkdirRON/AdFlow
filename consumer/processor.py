@@ -1,43 +1,54 @@
-import collections, json, kafka, time, datetime
+import collections, json, kafka, time
 from datetime import datetime
 import pandas
 import pyarrow as pa
 import pyarrow.parquet as pq
-from kafka import KafkaProducer
+from kafka import KafkaConsumer
 
-# need to look into adding config into .env file
 FLUSH_TIMER = 10
 TOPICS = ["clicks", "impressions", "bids"]
 BOOTSTRAP_SERVERS = ["localhost:9092"]
-AUTO_OFFSET_RESET='earliest'
-VALUE_DESERIALIZER =lambda x: json.loads(x.decode('utf-8'))
+AUTO_OFFSET_RESET = 'earliest'
+VALUE_DESERIALIZER = lambda x: json.loads(x.decode('utf-8'))
 
-consumer = kafka.KafkaConsumer(*TOPICS,
-                               bootstrap_servers=BOOTSTRAP_SERVERS,
-                               auto_offset_reset=AUTO_OFFSET_RESET,
-                               value_deserializer= VALUE_DESERIALIZER
-                             )
- # add msgs to a buffer
- # after 10 seconds, flush buffer into parquet file
- # clear buffer, reset time, rinse and repeat.
+consumer = KafkaConsumer(
+    *TOPICS,
+    bootstrap_servers=BOOTSTRAP_SERVERS,
+    auto_offset_reset=AUTO_OFFSET_RESET,
+    value_deserializer=VALUE_DESERIALIZER,
+    consumer_timeout_ms=1000  # fixed this: unblocks the for-loop every 1s so flush can trigger even if no messages arrive
+)
+
+def flush_buffer(buffer):
+    # Write buffer to a timestamped parquet file and clear it.
+    if not buffer:
+        print("Buffer empty, nothing to flush.")
+        return
+    df = pandas.DataFrame(buffer)
+    now = datetime.now()
+    filename = f"parquet_files/event_{now.strftime('%Y-%d-%m_%H-%M-%S')}.parquet"
+    df.to_parquet(filename)
+    print(f"Flushed {len(buffer)} records to {filename}")
+    buffer.clear()
 
 try:
-    buffer = [] # hold each batch of msgs into list
-
+    buffer = []
     start = time.perf_counter()
-    for message in consumer:
 
-        if message is not None:
-            print(f"message received :{message.topic}")
-            curr_timer = time.perf_counter() - start
-            if float(curr_timer) < FLUSH_TIMER: # flush_timer is currently set to 10 seconds
-                buffer.append(message.value)
-            else: # 10 seconds have passed flush buffer to a parquet and reset time
-                df = pandas.DataFrame(buffer)
-                now = datetime.now()
-                df.to_parquet(f"event_{now.strftime('%Y-%d-%m_%H-%M-%S_')}.parquet")
-                buffer.clear()
-                start = time.perf_counter()
+    while True:
+        for message in consumer:
+            if message is not None:
+                print(f"Message received: {message.topic}")
+                buffer.append(message.value)  # FIX: always append BEFORE checking timer
 
-except KeyboardInterrupt as e:
-    print(f'user interrupted. {e}')
+        elapsed = time.perf_counter() - start
+        if elapsed >= FLUSH_TIMER:
+            flush_buffer(buffer)
+            start = time.perf_counter()
+
+except KeyboardInterrupt:
+    print("User interrupted — flushing remaining buffer...")
+    flush_buffer(buffer)  # fixed this: flush whatever is left on exit
+finally:
+    consumer.close()
+    print("Consumer closed.")
