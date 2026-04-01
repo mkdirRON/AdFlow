@@ -1,14 +1,25 @@
-import json, random, uuid, time, argparse, kafka
+import json, random, uuid, time, argparse, kafka, os
 from collections import defaultdict
 from datetime import datetime
+from dotenv import load_dotenv
+
+#nonsense just to read from a damn env file (the simple way wasn't working and this was the fix given by Claude)
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+
+required = ["BOOTSTRAP_SERVERS"]
+missing = [key for key in required if os.getenv(key) is None]
+if missing:
+    raise EnvironmentError(f"Missing required .env variables: {missing}")
+
+# end of that garbage
 
 start_time = time.perf_counter()
 
-BOOTSTRAP_SERVERS=['localhost:9092']
+BOOTSTRAP_SERVERS= os.getenv("BOOTSTRAP_SERVERS")
 VALUE_SERIALIZER =lambda v: json.dumps(v).encode('utf-8')
 
 # init out kafka producer.
-producer = kafka.KafkaProducer(bootstrap_servers=BOOTSTRAP_SERVERS,
+producer = kafka.KafkaProducer(bootstrap_servers=[BOOTSTRAP_SERVERS],
                                value_serializer= VALUE_SERIALIZER
                               )
 
@@ -18,7 +29,7 @@ def create_event():  # a base func that handles generic event creation
         "timestamp": str(datetime.now()),
         "user_id": f"user_{random.randint(1, 100000)}",
         "campaign_id": f"camp_id{random.randint(1, 100000)}",
-        "site": random.choice(["news.com", "sports.com", "finance.com", "cars.com"])
+        "site": random.choice(["news.com", "sports.com", "finance.com", "cars.com", "infonet.net"])
     }
 
 # func that adds metadata that makes a genric event an "impression" should take a dict as input"
@@ -49,7 +60,7 @@ parser.add_argument("--rate",
 args = parser.parse_args()
 
 #gerating events and storing
-for _ in range(10000):
+while True:
         iteration_start_time = time.perf_counter()  # start timer to collect time elapsed for a single event
 
         event = random.choice([create_impression(create_event()),
@@ -70,6 +81,8 @@ for _ in range(10000):
         if sleep_time < 0:
             sleep_time = 0
         time.sleep(sleep_time)
+
+
 
 end_time = time.perf_counter()
 print(f"Time taken: {end_time - start_time} seconds")

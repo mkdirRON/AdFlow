@@ -1,32 +1,48 @@
-import collections, json, kafka, time
+import collections, json, kafka, time, os
+from dotenv import load_dotenv
 from datetime import datetime
 import pandas
 import pyarrow as pa
 import pyarrow.parquet as pq
 from kafka import KafkaConsumer
 
+# os even more nonsense just to read from a damn env file (the simple way wasn't working and this was the fix given by Claude)
+load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
+
+required = ["TOPICS", "BOOTSTRAP_SERVERS", "AUTO_OFFSET_RESET", "CONSUMER_TIMEOUT_MS", "OUTPUT_DIR"]
+missing = [key for key in required if os.getenv(key) is None]
+if missing:
+    raise EnvironmentError(f"Missing required .env variables: {missing}")
+
+# end of that nonsense
+
 FLUSH_TIMER = 10
-TOPICS = ["clicks", "impressions", "bids"]
-BOOTSTRAP_SERVERS = ["localhost:9092"]
-AUTO_OFFSET_RESET = 'earliest'
+TOPICS = os.getenv("TOPICS").split(", ")
+BOOTSTRAP_SERVERS = os.getenv("BOOTSTRAP_SERVERS")
+AUTO_OFFSET_RESET = os.getenv("AUTO_OFFSET_RESET")
+CONSUMER_TIMEOUT_MS = int(os.getenv("CONSUMER_TIMEOUT_MS"))
+OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./parquet_files")
 VALUE_DESERIALIZER = lambda x: json.loads(x.decode('utf-8'))
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 
 consumer = KafkaConsumer(
     *TOPICS,
-    bootstrap_servers=BOOTSTRAP_SERVERS,
+    bootstrap_servers=[BOOTSTRAP_SERVERS],
     auto_offset_reset=AUTO_OFFSET_RESET,
     value_deserializer=VALUE_DESERIALIZER,
-    consumer_timeout_ms=1000  # fixed this: unblocks the for-loop every 1s so flush can trigger even if no messages arrive
+    consumer_timeout_ms=CONSUMER_TIMEOUT_MS
 )
 
+'''func that will handle transforming output from buffer to parquet file then clearing the buffer '''
 def flush_buffer(buffer):
-    # Write buffer to a timestamped parquet file and clear it.
     if not buffer:
         print("Buffer empty, nothing to flush.")
         return
     df = pandas.DataFrame(buffer)
     now = datetime.now()
-    filename = f"parquet_files/event_{now.strftime('%Y-%d-%m_%H-%M-%S')}.parquet"
+    filename = os.path.join(OUTPUT_DIR, f"event_{now.strftime('%Y-%d-%m_%H-%M-%S')}.parquet")
     df.to_parquet(filename)
     print(f"Flushed {len(buffer)} records to {filename}")
     buffer.clear()
@@ -39,7 +55,7 @@ try:
         for message in consumer:
             if message is not None:
                 print(f"Message received: {message.topic}")
-                buffer.append(message.value)  # FIX: always append BEFORE checking timer
+                buffer.append(message.value)
 
         elapsed = time.perf_counter() - start
         if elapsed >= FLUSH_TIMER:
@@ -48,7 +64,7 @@ try:
 
 except KeyboardInterrupt:
     print("User interrupted — flushing remaining buffer...")
-    flush_buffer(buffer)  # fixed this: flush whatever is left on exit
+    flush_buffer(buffer)
 finally:
     consumer.close()
     print("Consumer closed.")

@@ -10,3 +10,6 @@
 /httpRequests/
 
 consumer/events.json
+
+.env
+
