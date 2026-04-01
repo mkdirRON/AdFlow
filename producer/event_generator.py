@@ -66,7 +66,7 @@ for _ in range(10000):
         iteration_end_time = time.perf_counter() # ending timer
 
         itr_time = iteration_end_time - iteration_start_time # time it took for one event
-        sleep_time = 1/args.rate - itr_time  # 1/[amount of events you want a second] - time it took for one event
+        sleep_time = 1/args.rate - itr_time
         if sleep_time < 0:
             sleep_time = 0
         time.sleep(sleep_time)
@@ -75,5 +75,4 @@ end_time = time.perf_counter()
 print(f"Time taken: {end_time - start_time} seconds")
 
 producer.flush()
-
 producer.close()
