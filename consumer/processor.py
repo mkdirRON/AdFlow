@@ -28,6 +28,7 @@ try:
     for message in consumer:
 
         if message is not None:
+            print(f"message received :{message.topic}")
             curr_timer = time.perf_counter() - start
             if float(curr_timer) < FLUSH_TIMER: # flush_timer is currently set to 10 seconds
                 buffer.append(message.value)
