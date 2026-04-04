@@ -1,10 +1,13 @@
-import collections, json, kafka, time, os
+import collections, json, kafka, time, os, redis
 from dotenv import load_dotenv
 from datetime import datetime
 import pandas
 import pyarrow as pa
 import pyarrow.parquet as pq
 from kafka import KafkaConsumer
+
+
+r = redis.Redis(host='localhost', port=6379, db=0)
 
 # os even more nonsense just to read from a damn env file (the simple way wasn't working and this was the fix given by Claude)
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
@@ -16,6 +19,7 @@ if missing:
 
 # end of that nonsense
 
+# retrieving needed kafka configs from .env file
 FLUSH_TIMER = 10
 TOPICS = os.getenv("TOPICS").split(", ")
 BOOTSTRAP_SERVERS = os.getenv("BOOTSTRAP_SERVERS")
@@ -26,7 +30,7 @@ VALUE_DESERIALIZER = lambda x: json.loads(x.decode('utf-8'))
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-
+#kafka consumer instance init and config
 consumer = KafkaConsumer(
     *TOPICS,
     bootstrap_servers=[BOOTSTRAP_SERVERS],
@@ -35,8 +39,9 @@ consumer = KafkaConsumer(
     consumer_timeout_ms=CONSUMER_TIMEOUT_MS
 )
 
-'''func that will handle transforming output from buffer to parquet file then clearing the buffer '''
+
 def flush_buffer(buffer):
+    '''func that will handle transforming output from a buffer(array) to parquet file then clearing the buffer '''
     if not buffer:
         print("Buffer empty, nothing to flush.")
         return
