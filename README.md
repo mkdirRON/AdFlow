@@ -48,11 +48,15 @@ A Python-based Kafka consumer that acts as a buffer.
 Create a `.env` file in the root directory (one level above your scripts) with the following variables:
 
 ```env
+#kafka 
 TOPICS=impressions, bids, clicks
 BOOTSTRAP_SERVERS=localhost:9092
 AUTO_OFFSET_RESET=earliest
 CONSUMER_TIMEOUT_MS=1000
 OUTPUT_DIR=./parquet_files 
+
+#redis 
+PORT=6379
 ```
 
 **2. Start the Kafka Broker and Redis Client**
