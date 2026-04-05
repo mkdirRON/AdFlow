@@ -11,4 +11,6 @@
 
 consumer/events.json
 
+/.env
 
+/parquet_files/

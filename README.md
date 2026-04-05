@@ -23,8 +23,8 @@ ad-data-pipeline/
 
 ## Current Components
 
-### 1. Kafka Infrastructure (`compose.yaml`)
-A Docker Compose setup that spins up an Apache Kafka broker (KRaft mode) and automatically initializes the required topics.
+### 1. Kafka and Redis Infrastructure (`compose.yaml`)
+A Docker Compose setup that spins up an Apache Kafka broker (KRaft mode) + Redis and automatically initializes the required topics for kafka
 * **Topics created:** `impressions`, `bids`, `clicks`.
 
 ### 2. Event Generator (`producer/event_generator.py`)
@@ -52,11 +52,11 @@ TOPICS=impressions, bids, clicks
 BOOTSTRAP_SERVERS=localhost:9092
 AUTO_OFFSET_RESET=earliest
 CONSUMER_TIMEOUT_MS=1000
-OUTPUT_DIR=./parquet_files
+OUTPUT_DIR=./parquet_files 
 ```
 
-**2. Start the Kafka Broker**
-Spin up the Kafka broker and initialize the topics:
+**2. Start the Kafka Broker and Redis Client**
+Spin up the Kafka and Redis  and initialize the topics:
 ``` bash 
 docker compose up -d
 ```
