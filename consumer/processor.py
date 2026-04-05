@@ -17,7 +17,7 @@ missing = [key for key in required if os.getenv(key) is None]
 if missing:
     raise EnvironmentError(f"Missing required .env variables: {missing}")
 
-# end of that nonsense
+# end of that nonsense.
 
 # retrieving needed kafka configs from .env file
 FLUSH_TIMER = 10
