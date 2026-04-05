@@ -1,4 +1,6 @@
 import collections, json, kafka, time, os, redis
+from pydoc_data.topics import topics
+
 from dotenv import load_dotenv
 from datetime import datetime
 import pandas
@@ -7,12 +9,10 @@ import pyarrow.parquet as pq
 from kafka import KafkaConsumer
 
 
-r = redis.Redis(host='localhost', port=6379, db=0)
-
 # os even more nonsense just to read from a damn env file (the simple way wasn't working and this was the fix given by Claude)
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-required = ["TOPICS", "BOOTSTRAP_SERVERS", "AUTO_OFFSET_RESET", "CONSUMER_TIMEOUT_MS", "OUTPUT_DIR"]
+required = ["TOPICS", "BOOTSTRAP_SERVERS", "AUTO_OFFSET_RESET", "CONSUMER_TIMEOUT_MS", "OUTPUT_DIR", "PORT"]
 missing = [key for key in required if os.getenv(key) is None]
 if missing:
     raise EnvironmentError(f"Missing required .env variables: {missing}")
@@ -28,6 +28,9 @@ CONSUMER_TIMEOUT_MS = int(os.getenv("CONSUMER_TIMEOUT_MS"))
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./parquet_files")
 VALUE_DESERIALIZER = lambda x: json.loads(x.decode('utf-8'))
 
+#redis config
+PORT = os.getenv("PORT")
+
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 #kafka consumer instance init and config
@@ -38,6 +41,7 @@ consumer = KafkaConsumer(
     value_deserializer=VALUE_DESERIALIZER,
     consumer_timeout_ms=CONSUMER_TIMEOUT_MS
 )
+r = redis.Redis(host='localhost', port=PORT, decode_responses=True)
 
 
 def flush_buffer(buffer):
@@ -57,10 +61,18 @@ try:
     start = time.perf_counter()
 
     while True:
-        for message in consumer:
+        for message in consumer: #reading form kafka events
             if message is not None:
                 print(f"Message received: {message.topic}")
                 buffer.append(message.value)
+
+                if message.topic == "impressions":
+                    r.incr(f"campaign:{message.value["campaign_id"]}:impressions")
+                if message.topic == "clicks":
+                    r.incr(f"campaign:{message.value["campaign_id"]}:clicks")
+                if message.topic == "bids":
+                    r.incr(f"campaign:{message.value["campaign_id"]}:bids")
+                    r.incrbyfloat(f"campaign:{message.value["campaign_id"]}:total_spend", message.value["bid_price"])
 
         elapsed = time.perf_counter() - start
         if elapsed >= FLUSH_TIMER:
