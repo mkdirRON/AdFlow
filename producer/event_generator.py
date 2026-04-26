@@ -60,7 +60,7 @@ parser.add_argument("--rate",
 args = parser.parse_args()
 
 #gerating events and storing
-for _ in range(10000):
+while True:
         iteration_start_time = time.perf_counter()  # start timer to collect time elapsed for a single event
 
         event = random.choice([create_impression(create_event()),

@@ -8,9 +8,8 @@
 /dataSources.local.xml
 # Editor-based HTTP Client requests
 /httpRequests/
-
 consumer/events.json
-
 /.env
 /venv
 /parquet_files/
+storage/parquet_files/*.parquet

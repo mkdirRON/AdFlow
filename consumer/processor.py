@@ -1,5 +1,6 @@
 import collections, json, kafka, time, os, redis
-from pydoc_data.topics import topics
+from metrics import *
+from prometheus_client import start_http_server, Counter, Gauge
 
 from dotenv import load_dotenv
 from datetime import datetime
@@ -28,10 +29,14 @@ CONSUMER_TIMEOUT_MS = int(os.getenv("CONSUMER_TIMEOUT_MS"))
 OUTPUT_DIR = os.getenv("OUTPUT_DIR", "./parquet_files")
 VALUE_DESERIALIZER = lambda x: json.loads(x.decode('utf-8'))
 
+
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
 #redis config
 PORT = os.getenv("PORT")
 
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+# starting https server for prometheus to collect data
+start_http_server(8000)
 
 #kafka consumer instance init and config
 consumer = KafkaConsumer(
@@ -63,16 +68,29 @@ try:
     while True:
         for message in consumer: #reading form kafka events
             if message is not None:
+                metrics = consumer.metrics()
+                rate = metrics.get('consumer-fetch-manager-metrics', {}).get('records-consumed-rate')
+
+                consumer_lag.set(rate)
+
                 print(f"Message received: {message.topic}")
                 buffer.append(message.value)
 
+                # storing the count of each event type to redis and prometheus
                 if message.topic == "impressions":
                     r.incr(f"campaign:{message.value["campaign_id"]}:impressions")
+                    impression_counter.inc()
+
                 if message.topic == "clicks":
                     r.incr(f"campaign:{message.value["campaign_id"]}:clicks")
+                    click_counter.inc()
+
+                # adding bid event count and total spent
                 if message.topic == "bids":
                     r.incr(f"campaign:{message.value["campaign_id"]}:bids")
                     r.incrbyfloat(f"campaign:{message.value["campaign_id"]}:total_spend", message.value["bid_price"])
+                    bid_counter.inc()
+
 
         elapsed = time.perf_counter() - start
         if elapsed >= FLUSH_TIMER:

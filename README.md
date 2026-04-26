@@ -13,19 +13,33 @@ ad-data-pipeline/
 ├── README.md
 ├── producer/
 │   └── event_generator.py    # Generates mock ad events (impressions, clicks, bids)
+    └──  metrics.py prometheus metrics config
 ├── consumer/
 │   └── processor.py          # Consumes Kafka topics and flushes batches to Parquet
-├── storage/                  # (WIP) Storage solutions for processed data
+├── storage/ # (WIP) Storage solutions for processed data
+    └──parquet_files           #coldstore location for generated data 
 ├── dashboard/                # (WIP) Analytics and visualization
 |---infra
+    └── grafana
+        └── dashboards
+        |   └── dashboard.yaml #dashboard config for grafana
+        └── provisioning
+            └── dashboard
+                └── prometheus.yaml # connection config to prometheus to grfana 
     └── compose.yaml              # Docker configuration for Kafka broker and topic initialization
 ```
 
-## Current Components
+##  Components
 
-### 1. Kafka and Redis Infrastructure (`compose.yaml`)
-A Docker Compose setup that spins up an Apache Kafka broker (KRaft mode) + Redis and automatically initializes the required topics for kafka
-* **Topics created:** `impressions`, `bids`, `clicks`.
+###  Infrastructure (`compose.yaml`)
+A Docker Compose setup that spins up the following services: 
+
+```yaml
+redis 
+kafka 
+prometheus
+grafana
+```
 
 ### 2. Event Generator (`producer/event_generator.py`)
 A Python script that generates synthetic ad tech data.
@@ -37,6 +51,7 @@ A Python script that generates synthetic ad tech data.
 A Python-based Kafka consumer that acts as a buffer.
 * Listens to the configured Kafka topics.
 * Buffers incoming JSON messages and flushes them to `.parquet` files using pandas and pyarrow every 10 seconds.
+* Handles sending data to redis and prometheus
 
 ## Prerequisites
 * [Docker](https://docs.docker.com/get-docker/) & Docker Compose
@@ -53,7 +68,7 @@ TOPICS=impressions, bids, clicks
 BOOTSTRAP_SERVERS=localhost:9092
 AUTO_OFFSET_RESET=earliest
 CONSUMER_TIMEOUT_MS=1000
-OUTPUT_DIR=./parquet_files 
+OUTPUT_DIR=./storage/parquet_files 
 
 #redis 
 PORT=6379
@@ -84,4 +99,3 @@ python producer/event_generator.py --rate 1000
 
 ## Future Work
 * **Storage:** Integrate cloud storage (e.g., AWS S3, Google Cloud Storage) to upload the generated Parquet files.
-* **Dashboard:** Build an analytics dashboard (e.g., Streamlit, Grafana, or Superset) to visualize bid prices, click-through rates, and impression volumes.
