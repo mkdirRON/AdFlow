@@ -4,19 +4,27 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))
 
-PORT = os.getenv("PORT")
+PORT = int(os.getenv("PORT"))
 r = redis.Redis(host='localhost', port=PORT, decode_responses=True)
 
 
 campaign_map = {}
+
 for key in r.scan_iter("campaign:*:*"):
     key = key.split(":")
     campaign_id = key[1]
 
-    campaign_map[campaign_id] = (f'{(str(r.get(f"campaign:{campaign_id}:impressions")))}, '
-                                 f'{(str(r.get(f"campaign:{campaign_id}:bids")))}, '
-                                 f'{(str(r.get(f"campaign:{campaign_id}:clicks")))}')
-    print(campaign_map)
+    campaign_map[campaign_id] = {
+        "impressions": int(r.get(f"campaign:{campaign_id}:impressions") or 0),
+        "bids": int(r.get(f"campaign:{campaign_id}:bids") or 0),
+        "clicks": int(r.get(f"campaign:{campaign_id}:clicks") or 0),
+        "total_spent": float(r.get(f"campaign:{campaign_id}:total_spend"))
+    }
+
+
+print(campaign_map)
+
+
     # topic = key[2]
     # if topic == "impressions":
     #     value = int(r.get(f"campaign:{campaign_id}:impressions"))
